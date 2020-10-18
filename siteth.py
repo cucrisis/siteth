@@ -11,6 +11,8 @@ import json
 import time
 import argparse
 import logging
+import requests
+import tarfile
 import subprocess
 from datetime import datetime
 
@@ -74,10 +76,51 @@ parser.add_argument('--txQtStartPort', type=int, default=22000, help="Tessera Qu
 parser.add_argument('--txPpStartPort', type=int, default=9000, help="Tessera Peer Network Start Port")
 parser.add_argument('--istanbulStartPort', type=int, default=30300, help="Istanbul start port")
 parser.add_argument('--gethParams', type=str, default="", help="Additional geth parameters")
+parser.add_argument('--update', action="store_true", help="Update binaries")
 
 # Collect Arguments
 args = parser.parse_args()
 
+def download(src, dst):
+    r = requests.get(src, allow_redirects=True)
+    open(dst, 'wb').write(r.content)
+
+
+def extract(src, dst):
+    my_tar = tarfile.open(src)
+    my_tar.extractall(dst)
+    my_tar.close()
+    
+if args.update:
+    ## Tessera https://oss.sonatype.org/service/local/repositories/releases/content/com/jpmorgan/quorum/tessera-app/0.10.6/tessera-app-0.10.6-app.jar
+    ## Quorum https://bintray.com/quorumengineering/quorum/download_file?file_path=v2.7.0/geth_v2.7.0_darwin_amd64.tar.gz
+    ## Istanbul https://bintray.com/api/ui/download/quorumengineering/istanbul-tools/istanbul-tools_v1.0.3_darwin_amd64.tar.gz
+    ## Bootnode https://bintray.com/api/ui/download/quorumengineering/geth-bootnode/bootnode_v1.9.7_darwin_amd64.tar.gz
+    logging.info("updating {}".format(VERSIONS))
+    if not os.path.exists(".siteth-tmp"):
+        os.mkdir(".siteth-tmp")
+
+    geth_path = "https://bintray.com/quorumengineering/quorum/download_file?file_path=v{}/geth_v{}_darwin_amd64.tar.gz".format(VERSIONS['geth'], VERSIONS['geth'])
+    tessera_path = "https://oss.sonatype.org/service/local/repositories/releases/content/com/jpmorgan/quorum/tessera-app/{}/tessera-app-{}-app.jar".format(VERSIONS['tessera'], VERSIONS['tessera'])
+    istanbul_path = "https://bintray.com/api/ui/download/quorumengineering/istanbul-tools/istanbul-tools_v{}_darwin_amd64.tar.gz".format(VERSIONS['istanbul'])
+    bootnode_path = "https://bintray.com/api/ui/download/quorumengineering/geth-bootnode/bootnode_v{}_darwin_amd64.tar.gz".format(VERSIONS['bootnode'])
+
+    logging.info("Downloading {}".format(geth_path))
+    download(geth_path,".siteth-tmp/geth.tar.gz")
+    extract(".siteth-tmp/geth.tar.gz","./res/bin")
+
+    logging.info("Downloading {}".format(tessera_path))
+    download(tessera_path, "./res/bin/tessera.jar")
+
+    logging.info("Downloading {}".format(istanbul_path))
+    download(istanbul_path,".siteth-tmp/istanbul.tar.gz")
+    extract(".siteth-tmp/istanbul.tar.gz","./res/bin")
+
+    logging.info("Downloading {}".format(bootnode_path))
+    download(bootnode_path, ".siteth-tmp/bootnode.tar.gz")
+    extract(".siteth-tmp/bootnode.tar.gz", "./res/bin")
+
+    shutil.rmtree(".siteth-tmp")
 
 if not args.skipGeth:
     args.skipGeth = []
